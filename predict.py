@@ -61,13 +61,9 @@ class Predictor(BasePredictor):
         self.weights_cache = WeightsDownloadCache()
         self.last_loaded_loras = {}
 
-        print("Loading safety checker...")
-        if not os.path.exists(SAFETY_CACHE):
-            download_weights(SAFETY_URL, SAFETY_CACHE)
-        self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-            SAFETY_CACHE, torch_dtype=torch.float16
-        ).to("cuda")
-        self.feature_extractor = CLIPImageProcessor.from_pretrained(FEATURE_EXTRACTOR)
+        print("Safety checker disabled")
+        self.safety_checker = None
+        self.feature_extractor = None
         
         print("Loading Flux txt2img Pipeline")
         if not os.path.exists(MODEL_CACHE):
@@ -320,23 +316,14 @@ class Predictor(BasePredictor):
 
         output = pipe(**common_args, **flux_kwargs)
 
-        if not disable_safety_checker:
-            _, has_nsfw_content = self.run_safety_checker(output.images)
-
         output_paths = []
         for i, image in enumerate(output.images):
-            if not disable_safety_checker and has_nsfw_content[i]:
-                print(f"NSFW content detected in image {i}")
-                continue
             output_path = f"/tmp/out-{i}.{output_format}"
             if output_format != 'png':
                 image.save(output_path, quality=output_quality, optimize=True)
             else:
                 image.save(output_path)
             output_paths.append(Path(output_path))
-
-        if len(output_paths) == 0:
-            raise Exception("NSFW content detected. Try running it again, or try a different prompt.")
 
         return output_paths
     
